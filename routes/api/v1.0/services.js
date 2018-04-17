@@ -1,5 +1,6 @@
 var express = require('express');
 var router = express.Router();
+var _ = require("underscore");
 var User = require("../../../database/collections/user");
 
 //CRUD Create, Read, Update, Delete
@@ -45,16 +46,70 @@ router.get(/user\/[a-z0-9]{1,}$/, (req, res) => {
         res.status(200).json(docs);
         return;
     }
+
     res.status(200).json({
       "msn" : "No existe el recurso "
     });
   })
 });
+
 router.delete(/user\/[a-z0-9]{1,}$/, (req, res) => {
   var url = req.url;
   var id = url.split("/")[2];
   User.find({_id : id}).remove().exec( (err, docs) => {
       res.status(200).json(docs);
+  });
+});
+router.patch(/user\/[a-z0-9]{1,}$/, (req, res) => {
+  var url = req.url;
+  var id = url.split("/")[2];
+  var keys = Object.keys(req.body);
+  var user = {};
+  for (var i = 0; i < keys.length; i++) {
+    user[keys[i]] = req.body[keys[i]];
+  }
+  console.log(user);
+  User.findOneAndUpdate({_id: id}, user, (err, params) => {
+      if(err) {
+        res.status(500).json({
+          "msn": "Error no se pudo actualizar los datos"
+        });
+        return;
+      }
+      res.status(200).json(params);
+      return;
+  });
+});
+router.put(/user\/[a-z0-9]{1,}$/, (req, res) => {
+  var url = req.url;
+  var id = url.split("/")[2];
+  var keys  = Object.keys(req.body);
+  var oficialkeys = ['name', 'altura', 'peso', 'edad', 'sexo', 'email'];
+  var result = _.difference(oficialkeys, keys);
+  if (result.length > 0) {
+    res.status(400).json({
+      "msn" : "Existe un error en el formato de envio puede hacer uso del metodo patch si desea editar solo un fragmentode la informacion"
+    });
+    return;
+  }
+
+  var user = {
+    name : req.body.name,
+    altura : req.body.altura,
+    peso : req.body.peso,
+    edad : req.body.edad,
+    sexo : req.body.sexo,
+    email : req.body.email
+  };
+  User.findOneAndUpdate({_id: id}, user, (err, params) => {
+      if(err) {
+        res.status(500).json({
+          "msn": "Error no se pudo actualizar los datos"
+        });
+        return;
+      }
+      res.status(200).json(params);
+      return;
   });
 });
 
