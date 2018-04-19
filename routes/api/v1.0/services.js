@@ -1,10 +1,50 @@
 var express = require('express');
+var multer = require('multer');
 var router = express.Router();
-var _ = require("underscore");
+//var _ = require("underscore");
 var User = require("../../../database/collections/user");
+var Img = require("../../../database/collections/img");
+
+var storage = multer.diskStorage({
+  destination: "./public/avatars",
+  filename: function (req, file, cb) {
+    console.log("-------------------------");
+    console.log(file);
+    cb(null, file.originalname + "-" + Date.now() + ".jpg");
+  }
+});
+var upload = multer({
+  storage: storage
+}).single("img");;
+
+
 
 //CRUD Create, Read, Update, Delete
 //Creation of users
+router.post("/userimg", (req, res) => {
+  upload(req, res, (err) => {
+    if (err) {
+      res.status(500).json({
+        "msn" : "No se ha podido subir la imagen"
+      });
+    } else {
+      var ruta = req.file.path.substr(6, req.file.path.length);
+      console.log(ruta);
+      var img = {
+        name : req.file.originalname,
+        physicalpath: req.file.path,
+        relativepath: "http://localhost:7777" + ruta
+      };
+      var imgData = new Img(img);
+      imgData.save().then( () => {
+        //content-type
+        res.status(200).json(
+          req.file
+        );
+      });
+    }
+  });
+});
 router.post("/user", (req, res) => {
   //Ejemplo de validacion
   if (req.body.name == "" && req.body.email == "") {
