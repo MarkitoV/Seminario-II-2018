@@ -5,6 +5,9 @@ var router = express.Router();
 var User = require("../../../database/collections/user");
 var Img = require("../../../database/collections/img");
 
+var jwt = require("jsonwebtoken");
+
+
 var storage = multer.diskStorage({
   destination: "./public/avatars",
   filename: function (req, file, cb) {
@@ -17,8 +20,55 @@ var upload = multer({
   storage: storage
 }).single("img");;
 
-
-
+/*
+Login USER
+*/
+router.post("/login", (req, res, next) => {
+  var username = req.body.username;
+  var password = req.body.password;
+  var result = User.findOne({name: username,password: password}).exec((err, doc) => {
+    if (err) {
+      res.status(200).json({
+        msn : "No se puede concretar con la peticion "
+      });
+      return;
+    }
+    if (doc) {
+      //res.status(200).json(doc);
+      jwt.sign({name: doc.name, password: doc.password}, "secretkey123", (err, token) => {
+          console.log(err);
+          res.status(200).json({
+            token : token
+          });
+      })
+    } else {
+      res.status(200).json({
+        msn : "El usuario no existe ne la base de datos"
+      });
+    }
+  });
+});
+//Middelware
+function verifytoken (req, res, next) {
+  //Recuperar el header
+  const header = req.headers["authorization"];
+  if (header  == undefined) {
+      res.status(403).json({
+        msn: "No autotizado"
+      })
+  } else {
+      req.token = header.split(" ")[1];
+      jwt.verify(req.token, "secretkey123", (err, authData) => {
+        if (err) {
+          res.status(403).json({
+            msn: "No autotizado"
+          })
+        } else {
+          next();
+        }
+      });
+  }
+}
 //CRUD Create, Read, Update, Delete
 //Creation of users
 router.post("/userimg", (req, res) => {
@@ -59,7 +109,8 @@ router.post("/user", (req, res) => {
     peso : req.body.peso,
     edad : req.body.edad,
     sexo : req.body.sexo,
-    email : req.body.email
+    email : req.body.email,
+    password : req.body.password
   };
   var userData = new User(user);
 
@@ -72,10 +123,25 @@ router.post("/user", (req, res) => {
 });
 
 // READ all users
-router.get("/user", (req, res, next) => {
-  User.find({}).exec( (error, docs) => {
-    res.status(200).json(docs);
-  })
+router.get("/user", verifytoken, (req, res, next) => {
+  console.log(req.token);
+  jwt.verify(req.token, "secretkey123", (err, authData) => {
+    if (err) {
+      res.status(403).json({
+        msn: "No autotizado"
+      });
+    } else {
+      User.find({}).exec( (error, docs) => {
+        res.status(200).json(
+          {
+            info: docs,
+            authData
+          }
+        );
+      })
+    }
+  });
+
 });
 // Read only one user
 router.get(/user\/[a-z0-9]{1,}$/, (req, res) => {
@@ -93,7 +159,7 @@ router.get(/user\/[a-z0-9]{1,}$/, (req, res) => {
   })
 });
 
-router.delete(/user\/[a-z0-9]{1,}$/, (req, res) => {
+router.delete(/user\/[a-z0-9]{1,}$/, verifytoken, (req, res) => {
   var url = req.url;
   var id = url.split("/")[2];
   User.find({_id : id}).remove().exec( (err, docs) => {
@@ -120,7 +186,7 @@ router.patch(/user\/[a-z0-9]{1,}$/, (req, res) => {
       return;
   });
 });
-router.put(/user\/[a-z0-9]{1,}$/, (req, res) => {
+router.put(/user\/[a-z0-9]{1,}$/, verifytoken,(req, res) => {
   var url = req.url;
   var id = url.split("/")[2];
   var keys  = Object.keys(req.body);
