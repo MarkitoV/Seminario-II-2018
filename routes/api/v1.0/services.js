@@ -1,8 +1,9 @@
 var express = require('express');
 var multer = require('multer');
 var router = express.Router();
+var fs = require('fs');
 //var _ = require("underscore");
-var User = require("../../../database/collections/user");
+var Home = require("../../../database/collections/homes");
 var Img = require("../../../database/collections/img");
 
 var jwt = require("jsonwebtoken");
@@ -13,7 +14,7 @@ var storage = multer.diskStorage({
   filename: function (req, file, cb) {
     console.log("-------------------------");
     console.log(file);
-    cb(null, file.originalname + "-" + Date.now() + ".jpg");
+    cb(null, "IMG_" + Date.now() + ".jpg");
   }
 });
 var upload = multer({
@@ -26,7 +27,7 @@ Login USER
 router.post("/login", (req, res, next) => {
   var username = req.body.username;
   var password = req.body.password;
-  var result = User.findOne({name: username,password: password}).exec((err, doc) => {
+  var result = Home.findOne({name: username,password: password}).exec((err, doc) => {
     if (err) {
       res.status(200).json({
         msn : "No se puede concretar con la peticion "
@@ -71,7 +72,9 @@ function verifytoken (req, res, next) {
 }
 //CRUD Create, Read, Update, Delete
 //Creation of users
-router.post("/userimg", (req, res) => {
+router.post(/homeimg\/[a-z0-9]{1,}$/, (req, res) => {
+  var url = req.url;
+  var id = url.split("/")[2];
   upload(req, res, (err) => {
     if (err) {
       res.status(500).json({
@@ -81,21 +84,65 @@ router.post("/userimg", (req, res) => {
       var ruta = req.file.path.substr(6, req.file.path.length);
       console.log(ruta);
       var img = {
+        idhome: id,
         name : req.file.originalname,
         physicalpath: req.file.path,
         relativepath: "http://localhost:7777" + ruta
       };
       var imgData = new Img(img);
-      imgData.save().then( () => {
+      imgData.save().then( (infoimg) => {
         //content-type
-        res.status(200).json(
-          req.file
-        );
+        //Update User IMG
+        var home = {
+          gallery: new Array()
+        }
+        Home.findOne({_id:id}).exec( (err, docs) =>{
+          //console.log(docs);
+          var data = docs.gallery;
+          var aux = new  Array();
+          if (data.length == 1 && data[0] == "") {
+            home.gallery.push("/api/v1.0/homeimg/" + infoimg._id)
+          } else {
+            aux.push("/api/v1.0/homeimg/" + infoimg._id);
+            data = data.concat(aux);
+            home.gallery = data;
+          }
+          Home.findOneAndUpdate({_id : id}, home, (err, params) => {
+              if (err) {
+                res.status(500).json({
+                  "msn" : "error en la actualizacion del usuario"
+                });
+                return;
+              }
+              res.status(200).json(
+                req.file
+              );
+              return;
+          });
+        });
       });
     }
   });
 });
-router.post("/user", (req, res) => {
+router.get(/homeimg\/[a-z0-9]{1,}$/, (req, res) => {
+  var url = req.url;
+  var id = url.split("/")[2];
+  console.log(id)
+  Img.findOne({_id: id}).exec((err, docs) => {
+    if (err) {
+      res.status(500).json({
+        "msn": "Sucedio algun error en el servicio"
+      });
+      return;
+    }
+    //regresamos la imagen deseada
+    var img = fs.readFileSync("./" + docs.physicalpath);
+    //var img = fs.readFileSync("./public/avatars/img.jpg");
+    res.contentType('image/jpeg');
+    res.status(200).send(img);
+  });
+});
+router.post("/home", (req, res) => {
   //Ejemplo de validacion
   if (req.body.name == "" && req.body.email == "") {
     res.status(400).json({
@@ -103,48 +150,75 @@ router.post("/user", (req, res) => {
     });
     return;
   }
-  var user = {
-    name : req.body.name,
-    altura : req.body.altura,
-    peso : req.body.peso,
-    edad : req.body.edad,
-    sexo : req.body.sexo,
-    email : req.body.email,
-    password : req.body.password
+  var home = {
+    street : req.body.street,
+    descripcion : req.body.descripcion,
+    price : req.body.price,
+    lat : req.body.lat,
+    lon : req.body.lon,
+    neighborhood : req.body.neighborhood,
+    city : req.body.city,
+    gallery: "",
+    contact: req.body.contact
   };
-  var userData = new User(user);
+  var homeData = new Home(home);
 
-  userData.save().then( () => {
+  homeData.save().then( (rr) => {
     //content-type
     res.status(200).json({
+      "id" : rr._id,
       "msn" : "usuario Registrado con exito "
     });
   });
 });
 
 // READ all users
-router.get("/user", verifytoken, (req, res, next) => {
-  console.log(req.token);
-  jwt.verify(req.token, "secretkey123", (err, authData) => {
-    if (err) {
-      res.status(403).json({
-        msn: "No autotizado"
-      });
-    } else {
-      User.find({}).exec( (error, docs) => {
-        res.status(200).json(
-          {
-            info: docs,
-            authData
-          }
-        );
-      })
-    }
-  });
+router.get("/home", (req, res, next) => {
+  var params = req.query;
+  console.log(params);
+  var price = params.price;
+  var over = params.over;
 
+  if (price == undefined && over == undefined) {
+    Home.find({}).exec( (error, docs) => {
+      res.status(200).json(
+        {
+          info: docs
+        }
+      );
+    })
+    return;
+  }
+  if (over == "equals") {
+    console.log("--------->>>>>>>")
+    Home.find({price:price}).exec( (error, docs) => {
+      res.status(200).json(
+        {
+          info: docs
+        }
+      );
+    })
+    return;
+  } else if ( over == "true") {
+    Home.find({price: {$gt:price}}).exec( (error, docs) => {
+      res.status(200).json(
+        {
+          info: docs
+        }
+      );
+    })
+  } else if (over == "false") {
+    Home.find({price: {$lt:price}}).exec( (error, docs) => {
+      res.status(200).json(
+        {
+          info: docs
+        }
+      );
+    })
+  }
 });
 // Read only one user
-router.get(/user\/[a-z0-9]{1,}$/, (req, res) => {
+router.get(/home\/[a-z0-9]{1,}$/, (req, res) => {
   var url = req.url;
   var id = url.split("/")[2];
   User.findOne({_id : id}).exec( (error, docs) => {
@@ -159,23 +233,23 @@ router.get(/user\/[a-z0-9]{1,}$/, (req, res) => {
   })
 });
 
-router.delete(/user\/[a-z0-9]{1,}$/, verifytoken, (req, res) => {
+router.delete(/home\/[a-z0-9]{1,}$/, verifytoken, (req, res) => {
   var url = req.url;
   var id = url.split("/")[2];
   User.find({_id : id}).remove().exec( (err, docs) => {
       res.status(200).json(docs);
   });
 });
-router.patch(/user\/[a-z0-9]{1,}$/, (req, res) => {
+router.patch(/home\/[a-z0-9]{1,}$/, (req, res) => {
   var url = req.url;
   var id = url.split("/")[2];
   var keys = Object.keys(req.body);
-  var user = {};
+  var home = {};
   for (var i = 0; i < keys.length; i++) {
-    user[keys[i]] = req.body[keys[i]];
+    home[keys[i]] = req.body[keys[i]];
   }
-  console.log(user);
-  User.findOneAndUpdate({_id: id}, user, (err, params) => {
+  console.log(home);
+  Home.findOneAndUpdate({_id: id}, home, (err, params) => {
       if(err) {
         res.status(500).json({
           "msn": "Error no se pudo actualizar los datos"
@@ -186,7 +260,7 @@ router.patch(/user\/[a-z0-9]{1,}$/, (req, res) => {
       return;
   });
 });
-router.put(/user\/[a-z0-9]{1,}$/, verifytoken,(req, res) => {
+router.put(/home\/[a-z0-9]{1,}$/, verifytoken,(req, res) => {
   var url = req.url;
   var id = url.split("/")[2];
   var keys  = Object.keys(req.body);
@@ -207,7 +281,7 @@ router.put(/user\/[a-z0-9]{1,}$/, verifytoken,(req, res) => {
     sexo : req.body.sexo,
     email : req.body.email
   };
-  User.findOneAndUpdate({_id: id}, user, (err, params) => {
+  Home.findOneAndUpdate({_id: id}, user, (err, params) => {
       if(err) {
         res.status(500).json({
           "msn": "Error no se pudo actualizar los datos"
@@ -217,135 +291,5 @@ router.put(/user\/[a-z0-9]{1,}$/, verifytoken,(req, res) => {
       res.status(200).json(params);
       return;
   });
-});
-
-
-
-/* GET home page. */
-router.post('/kcal', function(req, res, next) {
-  var information = [
-  "Albóndigas	100g	202 kcal	848 kJ",
-  "Arroz frito	100g	186 kcal	781 kJ",
-  "Arroz integral	100g	362 kcal	1520 kJ",
-  "Barbacoa de borrego	100g	170 kcal	714 kJ",
-  "Burrito	100g	163 kcal	685 kJ",
-  "Canelones	100g	153 kcal	643 kJ",
-  "Carne con tomate	100g	240 kcal	1008 kJ",
-  "Carne mechada	100g	254 kcal	1067 kJ",
-  "Chili con Carne	100g	105 kcal	441 kJ",
-  "Chuleta / Costeleta de cerdo	100g	225 kcal	945 kJ",
-  "Codillo de cerdo asado	100g	164 kcal	689 kJ",
-  "Costillas a la barbacoa / barbecue	100g	292 kcal	1226 kJ",
-  "Dal	100g	330 kcal	1386 kJ",
-  "Empanada de atún	100g	251 kcal	1054 kJ",
-  "Empanada de carne	100g	293 kcal	1231 kJ",
-  "Empanada de jamón y queso	100g	234 kcal	983 kJ",
-  "Enchiladas	100g	168 kcal	706 kJ",
-  "Ensalada César	100g	127 kcal	533 kJ",
-  "Ensalada de patata / papa	100g	143 kcal	601 kJ",
-  "Espaguetis a la boloñesa	100g	132 kcal	554 kJ",
-  "Estofado de ternera / Guisado de carne	100g	95 kcal	399 kJ",
-  "Fajita	100g	117 kcal	491 kJ",
-  "Fish and Chips / Pescado con papas	100g	195 kcal	819 kJ",
-  "Gazpacho	100g	80 kcal	336 kJ",
-  "Guiso de arroz	100g	243 kcal	1021 kJ",
-  "Guiso de fideos con carne	100g	400 kcal	1680 kJ",
-  "Guiso de lentejas	100g	336 kcal	1411 kJ",
-  "Guiso de porotos	100g	358 kcal	1504 kJ",
-  "Hummus / Puré de garbanzo	100g	177 kcal	743 kJ",
-  "Judías estofadas / Frijoles cocidos	100g	94 kcal	395 kJ",
-  "Kebab	100g	215 kcal	903 kJ",
-  "Lasaña	100g	132 kcal	554 kJ",
-  "Lasaña vegetal	100g	177 kcal	743 kJ",
-  "Locro	100g	191 kcal	802 kJ",
-  "Lomo de cerdo asado	100g	247 kcal	1037 kJ",
-  "Lomo en salsa	100g	108 kcal	454 kJ",
-  "Macarrones / Fideos a la boloñesa	100g	107 kcal	449 kJ",
-  "Macarrones / Fideos con queso	100g	370 kcal	1554 kJ",
-  "Milanesa de pescado	100g	275 kcal	1155 kJ",
-  "Milanesa de pollo	100g	115 kcal	483 kJ",
-  "Milanesa de ternera	100g	215 kcal	903 kJ",
-  "Mole poblano	100g	0 kcal	0 kJ",
-  "Moussaka	100g	120 kcal	504 kJ",
-  "Naan	100g	310 kcal	1302 kJ",
-  "Paella	100g	156 kcal	655 kJ",
-  "Patatas / Papas alioli	100g	250 kcal	1050 kJ",
-  "Patatas / Papas bravas	100g	130 kcal	546 kJ",
-  "Pato a la pekinesa	100g	225 kcal	945 kJ",
-  "Pizza	100g	267 kcal	1121 kJ",
-  "Polenta	100g	85 kcal	357 kJ",
-  "Pollo al horno	100g	164 kcal	689 kJ",
-  "Pollo asado / rostizado	100g	144 kcal	605 kJ",
-  "Pollo relleno	100g	220 kcal	924 kJ",
-  "Pozole	100g	0 kcal	0 kJ",
-  "Puré de patatas / papas	100g	83 kcal	349 kJ",
-  "Raviolis / Ravioles	100g	203 kcal	853 kJ",
-  "Rollito de primavera	100g	250 kcal	1050 kJ",
-  "Rosbif	100g	111 kcal	466 kJ",
-  "Salmorejo	100g	87 kcal	365 kJ",
-  "Sopa de guisantes / arvejas / chícharo	100g	75 kcal	315 kJ",
-  "Taco	100g	217 kcal	911 kJ",
-  "Tamales	100g	200 kcal	840 kJ",
-  "Tortilla de patatas / papas	100g	126 kcal	529 kJ"
-  ];
-  var wordkey = req.body.wordkey;
-  var expreg = new RegExp(wordkey);
-  var result = information.filter((key) => {
-    if (key.search(expreg) > -1) {
-      return true
-    }
-    return false;
-  });
-  res.send(
-    {
-      "wordkey" : wordkey,
-      "result" : result
-    });
-});
-
-router.post('/imc', function(req, res, next) {
-	var imc = Number(req.body.masa) / Math.pow(Number(req.body.altura), 2)
-	if (imc < 16) {
-		res.send(
-		{
-			"msn" : "Delgadez severa"
-		});
-	}else if (imc > 16 && imc < 16.99) {
-		res.send(
-		{
-			"msn" : "Delgadez moderada"
-		});
-	}else if (imc > 17 && imc < 18.49) {
-		res.send(
-		{
-			"msn" : "Delgadez leve"
-		});
-	}else if (imc >= 18.5 && imc <= 24.99) {
-		res.send(
-		{
-			"msn" : "Normal"
-		});
-	}else if (imc >= 25 && imc <= 29.99) {
-		res.send(
-		{
-			"msn" : "Sobre Peso"
-		});
-	}else if (imc >= 30 && imc <= 39.99) {
-		res.send(
-		{
-			"msn" : "Obesidad "
-		});
-	}else  if(imc >= 40){
-		res.send(
-		{
-			"msn" : "Obesidad morbida"
-		});
-	}else {
-		res.send(
-		{
-			"msn" : "Error en los datos "
-		});
-	}
-  //res.render('index', { title: 'Express' });
 });
 module.exports = router;
