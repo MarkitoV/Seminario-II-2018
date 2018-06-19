@@ -180,7 +180,8 @@ router.get("/home", (req, res, next) => {
   var over = params.over;
 
   if (price == undefined && over == undefined) {
-    Home.find({}).exec( (error, docs) => {
+    // filtra los datos que tengan en sus atributos lat y lon null;
+    Home.find({lat: {$ne: null}, lon: {$ne: null}}).exec( (error, docs) => {
       res.status(200).json(
         {
           info: docs
@@ -191,7 +192,7 @@ router.get("/home", (req, res, next) => {
   }
   if (over == "equals") {
     console.log("--------->>>>>>>")
-    Home.find({price:price}).exec( (error, docs) => {
+    Home.find({price:price, lat: {$ne: null}, lon: {$ne: null}}).exec( (error, docs) => {
       res.status(200).json(
         {
           info: docs
@@ -200,7 +201,7 @@ router.get("/home", (req, res, next) => {
     })
     return;
   } else if ( over == "true") {
-    Home.find({price: {$gt:price}}).exec( (error, docs) => {
+    Home.find({price: {$gt:price}, lat: {$ne: null}, lon: {$ne: null}}).exec( (error, docs) => {
       res.status(200).json(
         {
           info: docs
@@ -208,7 +209,7 @@ router.get("/home", (req, res, next) => {
       );
     })
   } else if (over == "false") {
-    Home.find({price: {$lt:price}}).exec( (error, docs) => {
+    Home.find({price: {$lt:price}, lat: {$ne: null}, lon: {$ne: null}}).exec( (error, docs) => {
       res.status(200).json(
         {
           info: docs
