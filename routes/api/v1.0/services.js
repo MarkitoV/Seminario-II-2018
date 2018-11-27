@@ -338,12 +338,33 @@ router.post("/imgrestaurant", (req, res) => {
       return;
     }
     if (docs != undefined) {
-      res.status(200).json({
-        "msn" : "Imagen Guardada."
+      /*res.status(200).json({
+       *"msn" : "Imagen Guardada."
+       *});
+       */
+      upload(req, res, (err) => {
+        if (err) {
+          res.status(500).json({
+            "msn" : "Error al subir la imagen."
+          });
+        }
+        var url = req.file.path.replace(/public/g, "");
+
+        RESTAURANT.update({_id: id}, {$set:{picture:url}}, (err, docs) => {
+          if(err) {
+            res.status(200).json({
+              "img" : url
+            });
+          }
+          res.status(200).json({
+            "img" : url
+          });
+        });
       });
     }
   });
 });
 
+//1:09:47 del video ayudaProyecto
 
 module.exports = router;
