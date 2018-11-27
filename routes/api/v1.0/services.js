@@ -3,14 +3,23 @@ var multer = require('multer');
 var router = express.Router();
 var fs = require('fs');
 //var _ = require("underscore");
-var Home = require("../../../database/collections/homes");
-var Img = require("../../../database/collections/img");
+
+/* Coneccion Antigua
+ *  var Home = require("../../../database/collections/homes");
+ *  var Img = require("../../../database/collections/img");
+ */
+
+//Nueva Coneccion
+var RESTAURANT = require("../../../database/collections/restaurant");
+var MENUS = require("../../../database/collections/menu");
+
 
 var jwt = require("jsonwebtoken");
 
+//Libreria para subir imagenes MULTER
 
 var storage = multer.diskStorage({
-  destination: "./public/avatars",
+  destination: "./public/restaurants",
   filename: function (req, file, cb) {
     console.log("-------------------------");
     console.log(file);
@@ -293,4 +302,48 @@ router.put(/home\/[a-z0-9]{1,}$/, verifytoken,(req, res) => {
       return;
   });
 });
+
+
+/*
+ * Aqui empieza el API del restaurant
+ */
+
+//subir restaurante
+router.post("/restaurant", (req, res) =>{
+  var data = req.body;
+
+  //Completar la validacion IMPORTANTE!!
+
+  data["registerdate"] = new Date();
+
+  var newrestaurant = new RESTAURANT(data);
+  newrestaurant.save().then( (rr) => {
+    //content-type
+    res.status(200).json({
+      "id" : rr._id,
+      "msn" : "Restaurante agregado con exito."
+    });
+  });
+});
+
+//subir imagen del restaurante
+router.post("/imgrestaurant", (req, res) => {
+  var params = req.query;
+  var id     = params.id;
+  RESTAURANT.findOne({_id: id}).exec((err, docs) =>{
+    if (err) {
+      res.status(501).json({
+        "msn" : "Problema con la base de datos."
+      });
+      return;
+    }
+    if (docs != undefined) {
+      res.status(200).json({
+        "msn" : "Imagen Guardada."
+      });
+    }
+  });
+});
+
+
 module.exports = router;
