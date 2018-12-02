@@ -353,12 +353,10 @@ router.post("/imgrestaurant", (req, res) => {
         RESTAURANT.update({_id: id}, {$set:{picture:url}}, (err, docs) => {
           if(err) {
             res.status(200).json({
-              "img" : url
+              "msn" : err
             });
           }
-          res.status(200).json({
-            "img" : url
-          });
+          res.status(200).json(docs);
         });
       });
     }
