@@ -326,6 +326,64 @@ router.post("/restaurant", (req, res) =>{
   });
 });
 
+//Mostrar Restaurantes
+router.get("/restaurant", (req, res) => {
+  var skip  = 0;
+  var limit = 10;
+  if (req.query.skip != null) {
+    skip = req.query.skip;
+  }
+  if (req.query.limit != null) {
+    limit = req.query.limit;
+  }
+  RESTAURANT.find({}).skip(skip).limit(limit).exec((err, docs) => {
+    if (err) {
+      res.status(500).json({
+        "msn" : "Error en la base de datos."
+      });
+      return;
+    }
+    res.status(200).json(docs);
+  });
+});
+
+//Actualizar Restaurant
+router.patch("/restaurant", (req, res) => {
+  url = req.url;
+  var params = req.body;
+  var id     = req.query.id;
+  //Collection data
+  var keys       = Object.keys(params);
+  var updatekeys = ["name", "nit", "property", "street", "phone", "log", "lat", "logo", "picture"];
+  var newkeys    = [];
+  var values     = [];
+  //seguridad
+  for (var i = 0; i < updatekeys.length; i++) {
+    var index = keys.indexOf(updatekeys[i]);
+    if (index != -1) {
+      newkeys.push(keys[index]);
+      values.push(params[keys[index]]);
+    }
+  }
+  var objupdate = {}
+  for (var i = 0; i < newkeys.length; i++) {
+    objupdate[newkeys[i]] = values[i];
+  }
+  console.log(objupdate);
+  RESTAURANT.findOneAndUpdate({_id: id}, objupdate, (err, docs) => {
+    if (err) {
+      res.status(500).json({
+        "msn" : "Existe un error en la base de datos."
+      });
+      return;
+    }
+    var id = docs._id
+    res.status(200).json({
+      "msn" : id
+    });
+  });
+});
+
 //subir imagen del restaurante
 router.post("/imgrestaurant", (req, res) => {
   var params = req.query;
@@ -363,6 +421,6 @@ router.post("/imgrestaurant", (req, res) => {
   });
 });
 
-//1:09:47 del video ayudaProyecto
+//1:14:07 del video ayudaProyecto
 
 module.exports = router;
