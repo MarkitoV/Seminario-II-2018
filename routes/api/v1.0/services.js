@@ -12,7 +12,7 @@ var fs = require('fs');
 //Nueva Coneccion
 var RESTAURANT = require("../../../database/collections/restaurant");
 var MENUS = require("../../../database/collections/menu");
-
+var CLIENT = require("../../../database/collections/client");
 
 var jwt = require("jsonwebtoken");
 
@@ -33,7 +33,8 @@ var upload = multer({
 /*
 Login USER
 */
-router.post("/login", (req, res, next) => {
+
+router.post("/loginhome", (req, res, next) => {
   var username = req.body.username;
   var password = req.body.password;
   var result = Home.findOne({name: username,password: password}).exec((err, doc) => {
@@ -58,7 +59,13 @@ router.post("/login", (req, res, next) => {
     }
   });
 });
-//Middelware
+
+/*
+ *
+ *Middelware para verificación del token
+ *esta funcion se usa en la API de restaurantes
+ *
+ */
 function verifytoken (req, res, next) {
   //Recuperar el header
   const header = req.headers["authorization"];
@@ -68,7 +75,7 @@ function verifytoken (req, res, next) {
       })
   } else {
       req.token = header.split(" ")[1];
-      jwt.verify(req.token, "secretkey123", (err, authData) => {
+      jwt.verify(req.token, "semilla", (err, authData) => {
         if (err) {
           res.status(403).json({
             msn: "No autotizado"
@@ -79,6 +86,7 @@ function verifytoken (req, res, next) {
       });
   }
 }
+
 //CRUD Create, Read, Update, Delete
 //Creation of users
 router.post(/homeimg\/[a-z0-9]{1,}$/, (req, res) => {
@@ -305,11 +313,55 @@ router.put(/home\/[a-z0-9]{1,}$/, verifytoken,(req, res) => {
 
 
 /*
- * Aqui empieza el API del restaurant
+ *
+ *
+ * Aqui empieza la API del restaurant
+ *
+ *
  */
 
+//registro de ususarios
+router.post("/client", (req, res) => {
+  var client = req.body;
+
+  //completar la validación IMPORTANTE!!
+
+  client["registerdate"] = new Date();
+  var cli = new CLIENT(client);
+  cli.save().then((docs) => {
+    res.status(200).json(docs);
+  });
+});
+
+//login del cliente
+router.post("/login", (req, res, next) => {
+  var email    = req.body.email;
+  var password = req.body.password;
+
+  var result = CLIENT.findOne({email: email, password: password}).exec((err, doc) => {
+    if (err) {
+      res.status(200).json({
+        "msn" : "Petición rechazada."
+      });
+      return;
+    }
+    if (doc) {
+      jwt.sign({name: doc.email, password: doc.password}, "semilla", (err, token) => {
+        console.log(err);
+        res.status(200).json({
+          token : token
+        });
+      });
+    } else {
+      res.status(500).json({
+        "msn" : "El usuario no existe en la base de datos."
+      });
+    }
+  });
+});
+
 //subir restaurante
-router.post("/restaurant", (req, res) =>{
+router.post("/restaurant", verifytoken, (req, res) =>{
   var data = req.body;
 
   //Completar la validacion IMPORTANTE!!
@@ -327,7 +379,7 @@ router.post("/restaurant", (req, res) =>{
 });
 
 //Mostrar Restaurantes
-router.get("/restaurant", (req, res) => {
+router.get("/restaurant", verifytoken, (req, res) => {
   var skip  = 0;
   var limit = 10;
   if (req.query.skip != null) {
@@ -348,7 +400,7 @@ router.get("/restaurant", (req, res) => {
 });
 
 //Actualizar Restaurant
-router.patch("/restaurant", (req, res) => {
+router.patch("/restaurant", verifytoken, (req, res) => {
   url = req.url;
   var params = req.body;
   var id     = req.query.id;
@@ -385,7 +437,7 @@ router.patch("/restaurant", (req, res) => {
 });
 
 //subir imagen del restaurante
-router.post("/imgrestaurant", (req, res) => {
+router.post("/imgrestaurant", verifytoken, (req, res) => {
   var params = req.query;
   var id     = params.id;
   RESTAURANT.findOne({_id: id}).exec((err, docs) =>{
@@ -421,6 +473,6 @@ router.post("/imgrestaurant", (req, res) => {
   });
 });
 
-//1:14:07 del video ayudaProyecto
+//1:25:59 del video ayudaProyecto
 
 module.exports = router;

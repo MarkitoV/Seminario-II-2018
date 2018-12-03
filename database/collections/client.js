@@ -6,7 +6,7 @@ var clientSchema = new Schema({
   email        : String,
   phone        : String,
   ci           : String,
-  Password     : String,
+  password     : String,
   registerdate : Date
 });
 var client = mongoose.model("client", clientSchema);
