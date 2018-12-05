@@ -2,7 +2,7 @@ var express = require('express');
 var multer = require('multer');
 var router = express.Router();
 var fs = require('fs');
-//var _ = require("underscore");
+var _ = require("underscore");
 
 /* Coneccion Antigua
  *  var Home = require("../../../database/collections/homes");
@@ -360,11 +360,17 @@ router.post("/login", (req, res, next) => {
   });
 });
 
-//subir restaurante
+//añadir restaurante
 router.post("/restaurant", verifytoken, (req, res) =>{
   var data = req.body;
 
-  //Completar la validacion IMPORTANTE!!
+  //validacion IMPORTANTE!!
+  if (req.body.name == "" && req.body.nit == "" && req.body.street == "") {
+    res.status(400).json({
+      "msn" : "Formato incorrecto"
+    });
+    return;
+  }
 
   data["registerdate"] = new Date();
 
@@ -378,7 +384,7 @@ router.post("/restaurant", verifytoken, (req, res) =>{
   });
 });
 
-//Mostrar Restaurantes
+//Mostrar todos los Restaurantes
 router.get("/restaurant", verifytoken, (req, res) => {
   var skip  = 0;
   var limit = 10;
@@ -396,6 +402,64 @@ router.get("/restaurant", verifytoken, (req, res) => {
       return;
     }
     res.status(200).json(docs);
+  });
+});
+
+//Mostrar un solo restaurante
+router.get(/\/restaurant\/[a-z0-9]{1,}$/, verifytoken, (req, res) => {
+  var url = req.url;
+  var id = url.split("/")[2];
+  RESTAURANT.findOne({_id : id}).exec( (error, docs) => {
+    if (docs != null) {
+        res.status(200).json(docs);
+        return;
+    }
+    res.status(404).json({
+      "msn" : "No existe el recurso "
+    });
+  })
+});
+
+//Eliminar restaurante
+router.delete(/\/restaurant\/[a-z0-9]{1,}$/, verifytoken, (req, res) => {
+  var url = req.url;
+  var id = url.split("/")[2];
+  RESTAURANT.find({_id : id}).remove().exec( (err, docs) => {
+      res.status(200).json(docs);
+  });
+});
+
+//Actualizar todo un objeto restaurante
+router.put(/restaurant\/[a-z0-9]{1,}$/, verifytoken,(req, res) => {
+  var url         = req.url;
+  var id          = url.split("/")[2];
+  var keys        = Object.keys(req.body);
+  var oficialkeys = ['name', 'nit', 'property', 'street', 'phone', 'log', 'lat'];
+  var result      = _.difference(oficialkeys, keys);
+  if (result.length > 0) {
+    res.status(400).json({
+      "msn" : "Existe un error en el formato, use patch si desea editar solo un fragmento de la informacion."
+    });
+    return;
+  }
+  var user = {
+    name     : req.body.name,
+    nit      : req.body.nit,
+    property : req.body.property,
+    street   : req.body.street,
+    phone    : req.body.phone,
+    log      : req.body.log,
+    lat      : req.body.lat
+  };
+  RESTAURANT.findOneAndUpdate({_id: id}, user, (err, params) => {
+      if(err) {
+        res.status(500).json({
+          "msn": "Error no se pudo actualizar los datos"
+        });
+        return;
+      }
+      res.status(200).json(params);
+      return;
   });
 });
 
@@ -472,7 +536,5 @@ router.post("/imgrestaurant", verifytoken, (req, res) => {
     }
   });
 });
-
-//1:25:59 del video ayudaProyecto
 
 module.exports = router;
