@@ -28,8 +28,19 @@ var storage = multer.diskStorage({
 });
 var upload = multer({
   storage: storage
-}).single("img");;
+}).single("img");//;
 
+var logostorage = multer.diskStorage({
+  destination: "./public/logorestaurants",
+  filename: function (req, file, cb) {
+    console.log("-------------------------");
+    console.log(file);
+    cb(null, "IMG_" + Date.now() + ".jpg");
+  }
+});
+var upload = multer({
+  storage: logostorage
+}).single("logo");
 /*
 Login USER
 */
@@ -324,7 +335,13 @@ router.put(/home\/[a-z0-9]{1,}$/, verifytoken,(req, res) => {
 router.post("/client", (req, res) => {
   var client = req.body;
 
-  //completar la validación IMPORTANTE!!
+  //validación IMPORTANTE!!
+  if (req.body.name == "" && req.body.email == "" && req.body.ci == "" && req.body.password == "") {
+    res.status(400).json({
+      "msn" : "Formato incorrecto"
+    });
+    return;
+  }
 
   client["registerdate"] = new Date();
   var cli = new CLIENT(client);
@@ -465,7 +482,7 @@ router.put(/restaurant\/[a-z0-9]{1,}$/, verifytoken,(req, res) => {
 
 //Actualizar Restaurant
 router.patch("/restaurant", verifytoken, (req, res) => {
-  url = req.url;
+  var url = req.url;
   var params = req.body;
   var id     = req.query.id;
   //Collection data
@@ -512,10 +529,6 @@ router.post("/imgrestaurant", verifytoken, (req, res) => {
       return;
     }
     if (docs != undefined) {
-      /*res.status(200).json({
-       *"msn" : "Imagen Guardada."
-       *});
-       */
       upload(req, res, (err) => {
         if (err) {
           res.status(500).json({
@@ -525,6 +538,39 @@ router.post("/imgrestaurant", verifytoken, (req, res) => {
         var url = req.file.path.replace(/public/g, "");
 
         RESTAURANT.update({_id: id}, {$set:{picture:url}}, (err, docs) => {
+          if(err) {
+            res.status(200).json({
+              "msn" : err
+            });
+          }
+          res.status(200).json(docs);
+        });
+      });
+    }
+  });
+});
+
+//subir logo del restaurante
+router.post("/logorestaurant", verifytoken, (req, res) => {
+  var params = req.query;
+  var id     = params.id;
+  RESTAURANT.findOne({_id: id}).exec((err, docs) =>{
+    if (err) {
+      res.status(501).json({
+        "msn" : "Problema con la base de datos."
+      });
+      return;
+    }
+    if (docs != undefined) {
+      upload(req, res, (err) => {
+        if (err) {
+          res.status(500).json({
+            "msn" : "Error al subir la imagen."
+          });
+        }
+        var url = req.file.path.replace(/public/g, "");
+
+        RESTAURANT.update({_id: id}, {$set:{logo:url}}, (err, docs) => {
           if(err) {
             res.status(200).json({
               "msn" : err
