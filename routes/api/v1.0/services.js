@@ -377,6 +377,120 @@ router.post("/login", (req, res, next) => {
   });
 });
 
+//Actualizar todo un objeto cliente
+router.put(/client\/[a-z0-9]{1,}$/, verifytoken,(req, res) => {
+  var url         = req.url;
+  var id          = url.split("/")[2];
+  var keys        = Object.keys(req.body);
+  var oficialkeys = ['name', 'email', 'phone', 'ci', 'password'];
+  var result      = _.difference(oficialkeys, keys);
+  if (result.length > 0) {
+    res.status(400).json({
+      "msn" : "Existe un error en el formato, use patch si desea editar solo un fragmento de la informacion."
+    });
+    return;
+  }
+  var user = {
+    name     : req.body.name,
+    email    : req.body.email,
+    phone    : req.body.phone,
+    ci       : req.body.ci,
+    password : req.body.password
+  };
+  CLIENT.findOneAndUpdate({_id: id}, user, (err, params) => {
+      if(err) {
+        res.status(500).json({
+          "msn": "Error no se pudo actualizar los datos"
+        });
+        return;
+      }
+      res.status(200).json(params);
+      return;
+  });
+});
+
+//Actualizar cliente
+router.patch("/client", verifytoken, (req, res) => {
+  var url = req.url;
+  var params = req.body;
+  var id     = req.query.id;
+  //Collection data
+  var keys       = Object.keys(params);
+  var updatekeys = ["name", "email", "phone", "ci", "password"];
+  var newkeys    = [];
+  var values     = [];
+  //seguridad
+  for (var i = 0; i < updatekeys.length; i++) {
+    var index = keys.indexOf(updatekeys[i]);
+    if (index != -1) {
+      newkeys.push(keys[index]);
+      values.push(params[keys[index]]);
+    }
+  }
+  var objupdate = {}
+  for (var i = 0; i < newkeys.length; i++) {
+    objupdate[newkeys[i]] = values[i];
+  }
+  console.log(objupdate);
+  CLIENT.findOneAndUpdate({_id: id}, objupdate, (err, docs) => {
+    if (err) {
+      res.status(500).json({
+        "msn" : "Existe un error en la base de datos."
+      });
+      return;
+    }
+    var id = docs._id
+    res.status(200).json({
+      "msn" : id
+    });
+  });
+});
+
+//Mostrar todos los clientes
+router.get("/client", verifytoken, (req, res) => {
+  var skip  = 0;
+  var limit = 10;
+  if (req.query.skip != null) {
+    skip = req.query.skip;
+  }
+  if (req.query.limit != null) {
+    limit = req.query.limit;
+  }
+  CLIENT.find({}).skip(skip).limit(limit).exec((err, docs) => {
+    if (err) {
+      res.status(500).json({
+        "msn" : "Error en la base de datos."
+      });
+      return;
+    }
+    res.status(200).json(docs);
+  });
+});
+
+//Mostrar un solo cliente
+router.get(/\/client\/[a-z0-9]{1,}$/, verifytoken, (req, res) => {
+  var url = req.url;
+  var id = url.split("/")[2];
+  CLIENT.findOne({_id : id}).exec( (error, docs) => {
+    if (docs != null) {
+        res.status(200).json(docs);
+        return;
+    }
+    res.status(404).json({
+      "msn" : "No existe el recurso "
+    });
+  })
+});
+
+//Eliminar cliente
+router.delete(/\/client\/[a-z0-9]{1,}$/, verifytoken, (req, res) => {
+  var url = req.url;
+  var id = url.split("/")[2];
+  CLIENT.find({_id : id}).remove().exec( (err, docs) => {
+      res.status(200).json(docs);
+  });
+});
+
 //añadir restaurante
 router.post("/restaurant", verifytoken, (req, res) =>{
   var data = req.body;
