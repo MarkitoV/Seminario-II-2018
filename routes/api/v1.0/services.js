@@ -11,8 +11,9 @@ var _ = require("underscore");
 
 //Nueva Coneccion
 var RESTAURANT = require("../../../database/collections/restaurant");
-var MENUS = require("../../../database/collections/menu");
-var CLIENT = require("../../../database/collections/client");
+var MENUS      = require("../../../database/collections/menu");
+var CLIENT     = require("../../../database/collections/client");
+var ORDERS     = require("../../../database/collections/orders");
 
 var jwt = require("jsonwebtoken");
 
@@ -870,6 +871,140 @@ router.delete(/\/menu\/[a-z0-9]{1,}$/, verifytoken, (req, res) => {
   var url = req.url;
   var id = url.split("/")[2];
   MENUS.find({_id : id}).remove().exec( (err, docs) => {
+      res.status(200).json(docs);
+  });
+});
+
+//registro de ordenes
+router.post("/order", verifytoken, (req, res) => {
+  var order = req.body;
+
+  //validación IMPORTANTE!!
+  if (req.body.street == "" && req.body.lat == "" && req.body.log == "") {
+    res.status(400).json({
+      "msn" : "Formato incorrecto"
+    });
+    return;
+  }
+
+  order["registerdate"] = new Date();
+  var order = new ORDERS(order);
+  order.save().then((docs) => {
+    res.status(200).json(docs);
+  });
+});
+
+//Actualizar todo un objeto order
+router.put(/order\/[a-z0-9]{1,}$/, verifytoken, (req, res) => {
+  var url         = req.url;
+  var id          = url.split("/")[2];
+  var keys        = Object.keys(req.body);
+  var oficialkeys = ['idmenu', 'idcliente', 'street', 'lat', 'log', 'pagototal'];
+  var result      = _.difference(oficialkeys, keys);
+  if (result.length > 0) {
+    res.status(400).json({
+      "msn" : "Existe un error en el formato, use patch si desea editar solo un fragmento de la informacion."
+    });
+    return;
+  }
+  var order = {
+    idmenu    : req.body.idmenu,
+    idcliente : req.body.idcliente,
+    street    : req.body.street,
+    lat       : req.body.lat,
+    log       : req.body.log,
+    pagototal : req.body.pagototal
+  };
+  ORDERS.findOneAndUpdate({_id: id}, order, (err, params) => {
+      if(err) {
+        res.status(500).json({
+          "msn": "Error no se pudo actualizar los datos"
+        });
+        return;
+      }
+      res.status(200).json(params);
+      return;
+  });
+});
+
+//Actualizar menu
+router.patch("/order", verifytoken, (req, res) => {
+  var url = req.url;
+  var params = req.body;
+  var id     = req.query.id;
+  //Collection data
+  var keys       = Object.keys(params);
+  var updatekeys = ["idmenu", "idcliente", "street", "lat", "log", "pagototal"];
+  var newkeys    = [];
+  var values     = [];
+  //seguridad
+  for (var i = 0; i < updatekeys.length; i++) {
+    var index = keys.indexOf(updatekeys[i]);
+    if (index != -1) {
+      newkeys.push(keys[index]);
+      values.push(params[keys[index]]);
+    }
+  }
+  var objupdate = {}
+  for (var i = 0; i < newkeys.length; i++) {
+    objupdate[newkeys[i]] = values[i];
+  }
+  console.log(objupdate);
+  ORDERS.findOneAndUpdate({_id: id}, objupdate, (err, docs) => {
+    if (err) {
+      res.status(500).json({
+        "msn" : "Existe un error en la base de datos."
+      });
+      return;
+    }
+    var id = docs._id
+    res.status(200).json({
+      "msn" : id
+    });
+  });
+});
+
+//Mostrar todos las ordenes
+router.get("/order", verifytoken, (req, res) => {
+  var skip  = 0;
+  var limit = 10;
+  if (req.query.skip != null) {
+    skip = req.query.skip;
+  }
+  if (req.query.limit != null) {
+    limit = req.query.limit;
+  }
+  ORDERS.find({}).skip(skip).limit(limit).exec((err, docs) => {
+    if (err) {
+      res.status(500).json({
+        "msn" : "Error en la base de datos."
+      });
+      return;
+    }
+    res.status(200).json(docs);
+  });
+});
+
+//Mostrar una sola orden
+router.get(/\/order\/[a-z0-9]{1,}$/, verifytoken, (req, res) => {
+  var url = req.url;
+  var id = url.split("/")[2];
+  ORDERS.findOne({_id : id}).exec( (error, docs) => {
+    if (docs != null) {
+        res.status(200).json(docs);
+        return;
+    }
+    res.status(404).json({
+      "msn" : "No existe el recurso "
+    });
+  });
+});
+
+//Eliminar orden
+router.delete(/\/order\/[a-z0-9]{1,}$/, verifytoken, (req, res) => {
+  var url = req.url;
+  var id = url.split("/")[2];
+  ORDERS.find({_id : id}).remove().exec( (err, docs) => {
       res.status(200).json(docs);
   });
 });
